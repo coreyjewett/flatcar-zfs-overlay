@@ -21,11 +21,12 @@ jobs:
     steps:
     - id: release
       run: |
-        FLATCAR_VERSION=${{ steps.version-info.outputs.FLATCAR_VERSION }};
-        release_url="${{github.server_url}}/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
+        FLATCAR_VERSION=${{ needs.info.outputs.FLATCAR_VERSION }};
+        release_url="https://github.com/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
 
+        echo "Checking if $release_url exists..."
         if curl --output /dev/null --silent --head --fail $release_url; then
-          echo "Already Released $release_url"
+          echo "Already Released"
           echo "exists=true" >> "$GITHUB_OUTPUT";
         fi
 
