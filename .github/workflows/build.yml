@@ -37,6 +37,10 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - run: make FLATCAR_VERSION=${{needs.info.outputs.FLATCAR_VERSION}}
+    - uses: cardinalby/git-tag-action@v1.0
+      env:
+        TAG: ${{ needs.info.outputs.FLATCAR_VERSION }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Release
       if: success()
       uses: softprops/action-gh-release@v1
