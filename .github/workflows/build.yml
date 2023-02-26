@@ -9,15 +9,15 @@ jobs:
     outputs:
       FLATCAR_VERSION: ${{ steps.curl.outputs.FLATCAR_VERSION }}
     steps:
-      - id: curl
-        run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
+    - id: curl
+      run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
 
   check:
     needs: info
     outputs:
       released: ${{ steps.release.outputs.exists }}
     steps:
-      id: release
+    - id: release
       run: |
         FLATCAR_VERSION=${{ steps.version-info.outputs.FLATCAR_VERSION }};
         release_url="${{github.server_url}}/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
