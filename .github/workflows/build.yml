@@ -1,13 +1,32 @@
 name: Build
 on:
-  push:
+  schedule:
+    # Every day at 4am
+    - cron: '0 4 * * *'
   workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - run: make
-    - uses: actions/upload-artifact@v3
-      with:
-        path: "*.raw"
+    - name: Fetch Version Info
+      id: version-info
+      curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
+    - name: Build
+      id: build
+      uses: actions/checkout@v2
+      run: |
+        FLATCAR_VERSION=${{ steps.version-info.outputs.FLATCAR_VERSION }};
+        release_url="${{github.server_url}}/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
+
+        if curl --output /dev/null --silent --head --fail $release_url; then
+          echo "Already Released $release_url"
+          echo "noop=true" >> "$GITHUB_OUTPUT";
+        else
+          make
+        fi
+    - name: Release
+        if: success() && !steps.build.outputs.noop
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version-info.outputs.FLATCAR_VERSION }}
+          path: "*.raw"

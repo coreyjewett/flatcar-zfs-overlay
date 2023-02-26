@@ -27,4 +27,4 @@ RUN mkdir -p /output && mksquashfs /work /output/zfs.raw -noappend
 
 FROM busybox
 COPY --from=staging /output /output
-CMD ["cp", "/output/zfs.raw", "/out/zfs-${FLATCAR_VERSION}.raw"]
+CMD ["cp", "/output/zfs.raw", "/out/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw"]
