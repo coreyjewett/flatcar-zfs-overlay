@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - id: curl
-      run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
+      run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | xargs -n1 echo | tee -a "${GITHUB_OUTPUT}"
 
   check:
     needs: info
