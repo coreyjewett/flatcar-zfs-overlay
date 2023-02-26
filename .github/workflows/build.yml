@@ -10,7 +10,7 @@ jobs:
     steps:
     - name: Fetch Version Info
       id: version-info
-      curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
+      run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
     - name: Build
       id: build
       uses: actions/checkout@v2
@@ -25,8 +25,8 @@ jobs:
           make
         fi
     - name: Release
-        if: success() && !steps.build.outputs.noop
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.version-info.outputs.FLATCAR_VERSION }}
-          path: "*.raw"
+      if: ${{ success() && !steps.build.outputs.noop }}
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version-info.outputs.FLATCAR_VERSION }}
+        path: "*.raw"
