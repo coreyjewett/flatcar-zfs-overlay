@@ -8,6 +8,7 @@ jobs:
   info:
     outputs:
       FLATCAR_VERSION: ${{ steps.curl.outputs.FLATCAR_VERSION }}
+    runs-on: ubuntu-latest
     steps:
     - id: curl
       run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
@@ -16,6 +17,7 @@ jobs:
     needs: info
     outputs:
       released: ${{ steps.release.outputs.exists }}
+    runs-on: ubuntu-latest
     steps:
     - id: release
       run: |
