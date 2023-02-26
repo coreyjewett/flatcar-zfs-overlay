@@ -30,7 +30,6 @@ jobs:
           echo "Already Released"
           echo "exists=true" >> "$GITHUB_OUTPUT";
         fi
-    - uses: gautamkrishnar/keepalive-workflow@v1
 
   build:
     needs: [ info, check ]
@@ -51,13 +50,9 @@ jobs:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-#    - name: Extract metadata (tags, labels) for Docker
-#     id: meta
-#     uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
-#     with:
-#         images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
     - name: Publish
-      run: docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}}
+      run: docker image push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    - uses: gautamkrishnar/keepalive-workflow@v1
 
 #   - uses: cardinalby/git-tag-action@v1.0
 #     env:
