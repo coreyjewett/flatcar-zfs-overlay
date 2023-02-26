@@ -1,5 +1,5 @@
-TAG = dev:latest
 FLATCAR_VERSION = 3200.0.0
+TAG = flatcar-zfs-overlay:$(FLATCAR_VERSION)
 OVERLAY_DIR = /var/lib/portage/zfs-overlay
 
 zfs.raw: container
@@ -12,3 +12,4 @@ container:
 
 base: TARGET=--target base
 base: container
+
