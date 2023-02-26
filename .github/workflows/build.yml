@@ -5,28 +5,38 @@ on:
     - cron: '0 4 * * *'
   workflow_dispatch:
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  info:
+    outputs:
+      FLATCAR_VERSION: ${{ steps.curl.outputs.FLATCAR_VERSION }}
     steps:
-    - name: Fetch Version Info
-      id: version-info
-      run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
-    - name: Build
-      id: build
-      uses: actions/checkout@v2
+      - id: curl
+        run: curl -L https://stable.release.flatcar-linux.net/amd64-usr/current/version.txt | tee -a "$GITHUB_OUTPUT"
+
+  check:
+    needs: info
+    outputs:
+      released: ${{ steps.release.outputs.exists }}
+    steps:
+      id: release
       run: |
         FLATCAR_VERSION=${{ steps.version-info.outputs.FLATCAR_VERSION }};
         release_url="${{github.server_url}}/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
 
         if curl --output /dev/null --silent --head --fail $release_url; then
           echo "Already Released $release_url"
-          echo "noop=true" >> "$GITHUB_OUTPUT";
-        else
-          make
+          echo "exists=true" >> "$GITHUB_OUTPUT";
         fi
+
+  build:
+    needs: [ info, check ]
+    if: ${{ !needs.check.outputs.released }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - run: make
     - name: Release
-      if: ${{ success() && !steps.build.outputs.noop }}
+      if: success()
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: ${{ steps.version-info.outputs.FLATCAR_VERSION }}
+        tag_name: ${{ needs.info.outputs.FLATCAR_VERSION }}
         path: "*.raw"
