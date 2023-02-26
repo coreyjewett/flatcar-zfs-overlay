@@ -1,5 +1,7 @@
 # Some solid inspriation borrowed from https://github.com/mediadepot/docker-flatcar-developer/blob/master/.github/workflows/build.yaml
 name: Build
+env:
+  PROJECT_NAME: flatcar-zfs-overlay
 on:
   schedule:
     # Every day at 4am
@@ -23,7 +25,7 @@ jobs:
     - id: release
       run: |
         FLATCAR_VERSION=${{ needs.info.outputs.FLATCAR_VERSION }};
-        release_url="https://github.com/${{github.repository}}/releases/download/${FLATCAR_VERSION}/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw";
+        release_url="https://github.com/${{github.repository}}/releases/download/${FLATCAR_VERSION}/${{env.PROJECT_NAME}}-${FLATCAR_VERSION}.raw";
 
         echo "Checking if $release_url exists..."
         if curl --output /dev/null --silent --head --fail $release_url; then
@@ -37,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REGISTRY: ghcr.io
+      # e.g. cjewett/flatcar-zfs-overlay
       IMAGE_NAME: ${{ github.repository }}
     permissions:
       contents: read
@@ -51,7 +54,9 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     - name: Publish
-      run: docker image push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      run: |
+        docker image tag ${{ env.PROJECT_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}}
+        docker image push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
     - uses: gautamkrishnar/keepalive-workflow@v1
 
 #   - uses: cardinalby/git-tag-action@v1.0
