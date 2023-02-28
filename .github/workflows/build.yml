@@ -42,7 +42,7 @@ jobs:
           echo "exists=false" >> "$GITHUB_OUTPUT";
         fi
     - uses: actions/checkout@v2
-    - uses: gautamkrishnar/keepalive-workflow@v1.1
+    - uses: gautamkrishnar/keepalive-workflow@1.1.0
 
   build:
     needs: [ info, check ]
