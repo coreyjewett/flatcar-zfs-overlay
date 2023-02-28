@@ -19,23 +19,34 @@ jobs:
   check:
     needs: info
     outputs:
-      released: ${{ steps.release.outputs.exists }}
+      image_exists: ${{ steps.image.outputs.exists }}
     runs-on: ubuntu-latest
     steps:
-    - id: release
+    - id: image
       run: |
         FLATCAR_VERSION=${{ needs.info.outputs.FLATCAR_VERSION }};
-        release_url="https://github.com/${{github.repository}}/releases/download/${FLATCAR_VERSION}/${{env.PROJECT_NAME}}-${FLATCAR_VERSION}.raw";
 
-        echo "Checking if $release_url exists..."
-        if curl --output /dev/null --silent --head --fail $release_url; then
-          echo "Already Released"
+        # public token
+        TOKEN=$(curl --silent https://ghcr.io/token\?scope\="repository:${{ github.repository }}:pull" | jq -r .token)
+
+        # private token
+        # TOKEN=$(echo -n ${{ secrets.GITHUB_TOKEN }} | base64)
+
+        url="https://ghcr.io/v2/${{ github.repository }}/manifests/${FLATCAR_VERSION}";
+        status=$(curl -H "Authorization: Bearer ${TOKEN}" -o /dev/null -w "%{http_code}" --silent $url);
+        if [ "$status" == 200 ]; then
+          echo "Image ${{ github.repository }}:${FLATCAR_VERSION} already exists"
           echo "exists=true" >> "$GITHUB_OUTPUT";
+        else
+          echo "Image ${{ github.repository }}:${FLATCAR_VERSION} not found at $url ($status)"
+          echo "exists=false" >> "$GITHUB_OUTPUT";
         fi
+    - uses: actions/checkout@v2
+    - uses: gautamkrishnar/keepalive-workflow@v1.1
 
   build:
     needs: [ info, check ]
-    if: ${{ !needs.check.outputs.released }}
+    if: ${{ !needs.check.outputs.image_exists }}
     runs-on: ubuntu-latest
     env:
       REGISTRY: ghcr.io
@@ -45,7 +56,6 @@ jobs:
       contents: read
       packages: write
     steps:
-    - uses: actions/checkout@v2
     - run: make FLATCAR_VERSION=${{needs.info.outputs.FLATCAR_VERSION}}
     - name: Log in to the Container registry
       uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
@@ -57,15 +67,3 @@ jobs:
       run: |
         docker image tag ${{ env.PROJECT_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}}
         docker image push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-    - uses: gautamkrishnar/keepalive-workflow@v1
-
-#   - uses: cardinalby/git-tag-action@v1.0
-#     env:
-#       TAG: ${{ needs.info.outputs.FLATCAR_VERSION }}
-#       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-#   - name: Release
-#     if: success()
-#     uses: softprops/action-gh-release@v1
-#     with:
-#       tag_name: ${{ needs.info.outputs.FLATCAR_VERSION }}
-#       files: "*.raw"
