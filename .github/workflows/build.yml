@@ -29,9 +29,6 @@ jobs:
         # public token
         TOKEN=$(curl --silent https://ghcr.io/token\?scope\="repository:${{ github.repository }}:pull" | jq -r .token)
 
-        # private token
-        # TOKEN=$(echo -n ${{ secrets.GITHUB_TOKEN }} | base64)
-
         url="https://ghcr.io/v2/${{ github.repository }}/manifests/${FLATCAR_VERSION}";
         status=$(curl -H "Authorization: Bearer ${TOKEN}" -o /dev/null -w "%{http_code}" --silent $url);
         if [ "$status" == 200 ]; then
@@ -39,7 +36,6 @@ jobs:
           echo "exists=true" >> "$GITHUB_OUTPUT";
         else
           echo "Image ${{ github.repository }}:${FLATCAR_VERSION} not found at $url ($status)"
-          echo "exists=false" >> "$GITHUB_OUTPUT";
         fi
     - uses: actions/checkout@v2
     - uses: gautamkrishnar/keepalive-workflow@1.1.0
