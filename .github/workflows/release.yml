@@ -28,6 +28,6 @@ jobs:
     - uses: ncipollo/release-action@v1
       with:
         artifacts: "*.raw"
-        tag: "flatcar-"${{needs.info.outputs.FLATCAR_VERSION}}
+        tag: flatcar-${{needs.info.outputs.FLATCAR_VERSION}}
         makeLatest: false
         omitBody: true
