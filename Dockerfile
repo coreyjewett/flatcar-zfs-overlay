@@ -29,4 +29,4 @@ RUN mkdir -p /output && mksquashfs /work /output/flatcar-zfs-overlay-${FLATCAR_V
 
 FROM busybox
 COPY --from=staging /output /output
-CMD ["cp", "/output/*.raw", "/out/"]
+CMD ["sh", "-c", "cp /output/*.raw /out/"]
