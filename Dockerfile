@@ -28,7 +28,5 @@ COPY usr /work/usr
 RUN mkdir -p /output && mksquashfs /work /output/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw -noappend
 
 FROM busybox
-ARG FLATCAR_VERSION
-ENV FLATCAR_VERSION ${FLATCAR_VERSION}
 COPY --from=staging /output /output
-CMD cp /output/flatcar-zfs-overlay-${FLATCAR_VERSION}.raw /out/
+CMD ["cp", "/output/*.raw", "/out/"]

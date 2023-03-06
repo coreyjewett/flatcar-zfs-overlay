@@ -67,3 +67,8 @@ jobs:
       run: |
         docker image tag ${{ env.PROJECT_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{needs.info.outputs.FLATCAR_VERSION}}
         docker image push --all-tags ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    - name: Git Tag
+      uses: hole19/git-tag-action@v1.0
+      env:
+        TAG: flatcar-${{needs.info.outputs.FLATCAR_VERSION}}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
