@@ -37,8 +37,8 @@ jobs:
         else
           echo "Image ${{ github.repository }}:${FLATCAR_VERSION} not found at $url ($status)"
         fi
-    - uses: actions/checkout@v2
-    - uses: gautamkrishnar/keepalive-workflow@1.1.0
+    - uses: actions/checkout@v3
+    - uses: gautamkrishnar/keepalive-workflow@1
 
   build:
     needs: [ info, check ]
@@ -52,7 +52,7 @@ jobs:
       contents: read
       packages: write
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - run: make FLATCAR_VERSION=${{needs.info.outputs.FLATCAR_VERSION}}
     - name: Log in to the Container registry
       uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
