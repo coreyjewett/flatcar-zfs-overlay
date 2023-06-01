@@ -1,7 +1,7 @@
-# Copyright 1999-2021 Gentoo Authors
+# Copyright 1999-2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 
 inherit autotools dist-kernel-utils flag-o-matic linux-mod toolchain-funcs
 
@@ -12,31 +12,45 @@ if [[ ${PV} == "9999" ]]; then
 	inherit git-r3
 	EGIT_REPO_URI="https://github.com/openzfs/zfs.git"
 else
-	SRC_URI="https://github.com/openzfs/zfs/releases/download/zfs-${PV}/zfs-${PV}.tar.gz"
-	KEYWORDS="amd64 arm64 ppc64"
-	S="${WORKDIR}/zfs-${PV}"
-	ZFS_KERNEL_COMPAT="5.9"
+	VERIFY_SIG_OPENPGP_KEY_PATH=${BROOT}/usr/share/openpgp-keys/openzfs.asc
+	inherit verify-sig
+
+	MY_PV="${PV/_rc/-rc}"
+	SRC_URI="https://github.com/openzfs/zfs/releases/download/zfs-${MY_PV}/zfs-${MY_PV}.tar.gz"
+	SRC_URI+=" verify-sig? ( https://github.com/openzfs/zfs/releases/download/zfs-${MY_PV}/zfs-${MY_PV}.tar.gz.asc )"
+	S="${WORKDIR}/zfs-${PV%_rc?}"
+	ZFS_KERNEL_COMPAT="6.2"
 
 	# increments minor eg 5.14 -> 5.15, and still supports override.
 	ZFS_KERNEL_DEP="${ZFS_KERNEL_COMPAT_OVERRIDE:-${ZFS_KERNEL_COMPAT}}"
 	ZFS_KERNEL_DEP="${ZFS_KERNEL_DEP%%.*}.$(( ${ZFS_KERNEL_DEP##*.} + 1))"
+
+	if [[ ${PV} != *_rc* ]]; then
+		KEYWORDS="~amd64 ~arm64 ~ppc64 ~riscv ~sparc"
+	fi
 fi
 
-LICENSE="CDDL debug? ( GPL-2+ )"
+LICENSE="CDDL MIT debug? ( GPL-2+ )"
 SLOT="0/${PVR}"
 IUSE="custom-cflags debug +rootfs"
 
-DEPEND=""
-
-RDEPEND="${DEPEND}
-	!sys-kernel/spl
-"
+RDEPEND="${DEPEND}"
 
 BDEPEND="
 	dev-lang/perl
-	virtual/awk
-	dist-kernel? ( <virtual/dist-kernel-${ZFS_KERNEL_DEP}:= )
+	app-alternatives/awk
 "
+
+# we want dist-kernel block in BDEPEND because of portage resolver.
+# since linux-mod.eclass already sets version-unbounded dep, portage
+# will pull new versions. So we set it in BDEPEND which takes priority.
+# and we don't need in in git ebuild.
+if [[ ${PV} != "9999" ]] ; then
+	BDEPEND+="
+		verify-sig? ( sec-keys/openpgp-keys-openzfs )
+		dist-kernel? ( <virtual/dist-kernel-${ZFS_KERNEL_DEP}:= )
+	"
+fi
 
 # PDEPEND in this form is needed to trick portage suggest
 # enabling dist-kernel if only 1 package have it set
@@ -45,6 +59,11 @@ PDEPEND="dist-kernel? ( ~sys-fs/zfs-${PV}[dist-kernel] )"
 RESTRICT="debug? ( strip ) test"
 
 DOCS=( AUTHORS COPYRIGHT META README.md )
+
+PATCHES=(
+	# https://github.com/openzfs/zfs/issues/14753
+	"${FILESDIR}"/2.1.10-Revert-ZFS_IOC_COUNT_FILLED-does-unnecessary-txg_wai.patch
+)
 
 pkg_pretend() {
 	use rootfs || return 0
@@ -56,9 +75,6 @@ pkg_pretend() {
 		ewarn "to auto-trigger initrd rebuilds with kernel updates"
 	fi
 }
-
-# https://github.com/openzfs/zfs/pull/11371
-PATCHES=( "${FILESDIR}/${PV}-copy-builtin.patch" )
 
 pkg_setup() {
 	CONFIG_CHECK="
@@ -83,10 +99,6 @@ pkg_setup() {
 			DEVTMPFS
 	"
 
-	if use arm64; then
-		kernel_is -ge 5 && CONFIG_CHECK="${CONFIG_CHECK} !PREEMPT"
-	fi
-
 	kernel_is -lt 5 && CONFIG_CHECK="${CONFIG_CHECK} IOSCHED_NOOP"
 
 	if [[ ${PV} != "9999" ]]; then
@@ -98,22 +110,29 @@ pkg_setup() {
 		kernel_is -le "${kv_major_max}" "${kv_minor_max}" || die \
 			"Linux ${kv_major_max}.${kv_minor_max} is the latest supported version"
 
-		# 0.8.x requires at least 2.6.32
-		kernel_is ge 2 6 32 || die "Linux 2.6.32 or newer required"
-	else
-		# git master requires at least 3.10
-		kernel_is -ge 3 10 || die "Linux 3.10 or newer required"
 	fi
 
+	kernel_is -ge 3 10 || die "Linux 3.10 or newer required"
+
 	linux-mod_pkg_setup
+}
+
+src_unpack() {
+	if use verify-sig ; then
+		# Needed for downloaded patch (which is unsigned, which is fine)
+		verify-sig_verify_detached "${DISTDIR}"/zfs-${MY_PV}.tar.gz{,.asc}
+	fi
+
+	default
 }
 
 src_prepare() {
 	default
 
-	if [[ ${PV} == "9999" ]]; then
-		eautoreconf
-	else
+	# Run unconditionally (bug #792627)
+	eautoreconf
+
+	if [[ ${PV} != "9999" ]]; then
 		# Set module revision number
 		sed -i "s/\(Release:\)\(.*\)1/\1\2${PR}-gentoo/" META || die "Could not set Gentoo release"
 	fi
@@ -141,7 +160,7 @@ src_configure() {
 		$(use_enable debug)
 	)
 
-	CONFIG_SHELL="${EPREFIX}/bin/bash" econf "${myconf[@]}"
+	econf "${myconf[@]}"
 }
 
 src_compile() {
@@ -160,8 +179,8 @@ src_install() {
 
 	myemakeargs+=(
 		DEPMOD=:
+		# INSTALL_MOD_PATH ?= $(DESTDIR) in module/Makefile
 		DESTDIR="${D}"
-		INSTALL_MOD_PATH="${EPREFIX:-/}" # lib/modules/<kver> added by KBUILD
 	)
 
 	emake "${myemakeargs[@]}" install
@@ -172,17 +191,8 @@ src_install() {
 pkg_postinst() {
 	linux-mod_pkg_postinst
 
-	# Remove old modules
-	if [[ -d "${EROOT}/lib/modules/${KV_FULL}/addon/zfs" ]]; then
-		ewarn "${PN} now installs modules in ${EROOT}/lib/modules/${KV_FULL}/extra/zfs"
-		ewarn "Old modules were detected in ${EROOT}/lib/modules/${KV_FULL}/addon/zfs"
-		ewarn "Automatically removing old modules to avoid problems."
-		rm -r "${EROOT}/lib/modules/${KV_FULL}/addon/zfs" || die "Cannot remove modules"
-		rmdir --ignore-fail-on-non-empty "${EROOT}/lib/modules/${KV_FULL}/addon"
-	fi
-
 	if [[ -z ${ROOT} ]] && use dist-kernel; then
-		set_arch_to_portage
+		set_arch_to_pkgmgr
 		dist-kernel_reinstall_initramfs "${KV_DIR}" "${KV_FULL}"
 	fi
 
@@ -191,22 +201,17 @@ pkg_postinst() {
 		ewarn "at least 256M and decreasing zfs_arc_max to some value less than that."
 	fi
 
-	ewarn "This version of OpenZFS includes support for new feature flags"
-	ewarn "that are incompatible with previous versions. GRUB2 support for"
-	ewarn "/boot with the new feature flags is not yet available."
-	ewarn "Do *NOT* upgrade root pools to use the new feature flags."
-	ewarn "Any new pools will be created with the new feature flags by default"
-	ewarn "and will not be compatible with older versions of OpenZFS. To"
-	ewarn "create a newpool that is backward compatible wih GRUB2, use "
-	ewarn
-	ewarn "zpool create -d -o feature@async_destroy=enabled "
-	ewarn "	-o feature@empty_bpobj=enabled -o feature@lz4_compress=enabled"
-	ewarn "	-o feature@spacemap_histogram=enabled"
-	ewarn "	-o feature@enabled_txg=enabled "
-	ewarn "	-o feature@extensible_dataset=enabled -o feature@bookmarks=enabled"
-	ewarn "	..."
-	ewarn
-	ewarn "GRUB2 support will be updated as soon as either the GRUB2"
-	ewarn "developers do a tag or the Gentoo developers find time to backport"
-	ewarn "support from GRUB2 HEAD."
+	if has_version sys-boot/grub; then
+		ewarn "This version of OpenZFS includes support for new feature flags"
+		ewarn "that are incompatible with previous versions. GRUB2 support for"
+		ewarn "/boot with the new feature flags is not yet available."
+		ewarn "Do *NOT* upgrade root pools to use the new feature flags."
+		ewarn "Any new pools will be created with the new feature flags by default"
+		ewarn "and will not be compatible with older versions of OpenZFS. To"
+		ewarn "create a new pool that is backward compatible wih GRUB2, use "
+		ewarn
+		ewarn "zpool create -o compatibility=grub2 ..."
+		ewarn
+		ewarn "Refer to /usr/share/zfs/compatibility.d/grub2 for list of features."
+	fi
 }

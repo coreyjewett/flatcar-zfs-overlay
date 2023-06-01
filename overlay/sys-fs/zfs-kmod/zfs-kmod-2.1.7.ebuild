@@ -1,7 +1,7 @@
-# Copyright 1999-2022 Gentoo Authors
+# Copyright 1999-2023 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-EAPI=7
+EAPI=8
 
 inherit autotools dist-kernel-utils flag-o-matic linux-mod toolchain-funcs
 
@@ -19,14 +19,14 @@ else
 	SRC_URI="https://github.com/openzfs/zfs/releases/download/zfs-${MY_PV}/zfs-${MY_PV}.tar.gz"
 	SRC_URI+=" verify-sig? ( https://github.com/openzfs/zfs/releases/download/zfs-${MY_PV}/zfs-${MY_PV}.tar.gz.asc )"
 	S="${WORKDIR}/zfs-${PV%_rc?}"
-	ZFS_KERNEL_COMPAT="5.17"
+	ZFS_KERNEL_COMPAT="6.0"
 
-	#  increments minor eg 5.14 -> 5.15, and still supports override.
+	# increments minor eg 5.14 -> 5.15, and still supports override.
 	ZFS_KERNEL_DEP="${ZFS_KERNEL_COMPAT_OVERRIDE:-${ZFS_KERNEL_COMPAT}}"
 	ZFS_KERNEL_DEP="${ZFS_KERNEL_DEP%%.*}.$(( ${ZFS_KERNEL_DEP##*.} + 1))"
 
 	if [[ ${PV} != *_rc* ]]; then
-		KEYWORDS="~amd64 ~arm64 ~ppc64 ~riscv"
+		KEYWORDS="amd64 arm64 ppc64 ~riscv ~sparc"
 	fi
 fi
 
@@ -34,13 +34,11 @@ LICENSE="CDDL MIT debug? ( GPL-2+ )"
 SLOT="0/${PVR}"
 IUSE="custom-cflags debug +rootfs"
 
-RDEPEND="${DEPEND}
-	!sys-kernel/spl
-"
+RDEPEND="${DEPEND}"
 
 BDEPEND="
 	dev-lang/perl
-	virtual/awk
+	app-alternatives/awk
 "
 
 # we want dist-kernel block in BDEPEND because of portage resolver.
@@ -61,6 +59,13 @@ PDEPEND="dist-kernel? ( ~sys-fs/zfs-${PV}[dist-kernel] )"
 RESTRICT="debug? ( strip ) test"
 
 DOCS=( AUTHORS COPYRIGHT META README.md )
+
+PATCHES=(
+	"${FILESDIR}"/${PN}-2.1.6-fgrep.patch
+
+	# https://github.com/openzfs/zfs/issues/14308
+	"${FILESDIR}"/2.1.7-ppc64-ieee128-compat.patch
+)
 
 pkg_pretend() {
 	use rootfs || return 0
@@ -112,6 +117,15 @@ pkg_setup() {
 	kernel_is -ge 3 10 || die "Linux 3.10 or newer required"
 
 	linux-mod_pkg_setup
+}
+
+src_unpack() {
+	if use verify-sig ; then
+		# Needed for downloaded patch (which is unsigned, which is fine)
+		verify-sig_verify_detached "${DISTDIR}"/zfs-${MY_PV}.tar.gz{,.asc}
+	fi
+
+	default
 }
 
 src_prepare() {
@@ -180,7 +194,7 @@ pkg_postinst() {
 	linux-mod_pkg_postinst
 
 	if [[ -z ${ROOT} ]] && use dist-kernel; then
-		set_arch_to_portage
+		set_arch_to_pkgmgr
 		dist-kernel_reinstall_initramfs "${KV_DIR}" "${KV_FULL}"
 	fi
 
@@ -196,7 +210,7 @@ pkg_postinst() {
 		ewarn "Do *NOT* upgrade root pools to use the new feature flags."
 		ewarn "Any new pools will be created with the new feature flags by default"
 		ewarn "and will not be compatible with older versions of OpenZFS. To"
-		ewarn "create a newpool that is backward compatible wih GRUB2, use "
+		ewarn "create a new pool that is backward compatible wih GRUB2, use "
 		ewarn
 		ewarn "zpool create -o compatibility=grub2 ..."
 		ewarn
