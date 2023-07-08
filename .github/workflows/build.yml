@@ -4,8 +4,8 @@ env:
   PROJECT_NAME: flatcar-zfs-overlay
 on:
   schedule:
-    # Every day at 4am
-    - cron: '0 4 * * *'
+    # Every day at 12pm; 2 hours after mediadepot/docker-flatcar-developer kicks off building containers
+    - cron: '0 12 * * *'
   workflow_dispatch:
 jobs:
   info:
